@@ -1,1 +1,226 @@
+# Counting number of unique users in each dataset:
+
+SELECT COUNT (DISTINCT id) 
+FROM `spatial-motif-388503.Health.WeightLog` 
+
+# Checking for duplicate entries:
+
+SELECT Id, 
+       Cleaned_date, 
+       TotalSleepRecords,
+        Count(*)
+FROM `spatial-motif-388503.Health.SleepDay` 
+GROUP BY id, Cleaned_date, TotalSleepRecords
+HAVING Count(*) > 1
+
+# Checking average number of days logged per product:
+
+With total_dates_logged as
+     (SELECT ID, 
+      COUNT (ActivityDate) as total_dates_logged
+ FROM `spatial-motif-388503.Health.DailyActivityMerged` 
+ GROUP BY ID)
+ SELECT AVG(total_dates_logged.total_dates_logged) as Average_days_logged
+ FROM total_dates_logged
+
+# Reformatting dates 
+
+SELECT Id,
+      ActivityDay,
+      EXTRACT (DAY from ActivityDay) as day,
+      EXTRACT (DAYOFWEEK from ActivityDay) as DayofWeek, 
+      Calories,
+     FROM `spatial-motif-388503.Health.Daily Calories` 
+
+# Creating column for total minutes worn and percent of month worn: 
+
+With total_minutes as 
+      (SELECT *, 
+      (VeryActiveMinutes + FairlyActiveMinutes + LightlyActiveMinutes + SedentaryMinutes) as total_minutes_worn 
+    FROM `spatial-motif-388503.Health.DailyActivityMerged` LIMIT 1000)
+SELECT *, 
+      total_minutes.total_minutes_worn,
+      (total_minutes.total_minutes_worn / 1440 *100) as PercentofDay_Worn
+  FROM total_minutes
+
+# Calculating average numbers of steps and calories burnt by day of month and day of week:
+
+SELECT day_of_week, 
+        AVG(TotalSteps) as Avg_steps,
+        AVG(Calories) as Avg_calories,
+        AVG(total_minutes_worn) Avg_minutes_Worn
+ FROM `spatial-motif-388503.Health.DailyActivityUserType` 
+ GROUP BY day_of_week
+ ORDER BY day_of_week
+
+# Creating Categories of activity by step count. 
+
+-- First, calculating average daily steps -- 
+SELECT ID,
+      AVG(TotalSteps) 
+      FROM `spatial-motif-388503.Health.ActiveMinutes` 
+      Group By Id
+-- Then assign groups based on steps -- 
+SELECT
+      ID,
+      CASE WHEN average_daily_steps <= 4000 THEN "Inactive"
+      WHEN average_daily_steps BETWEEN 4001 AND 7000 THEN "Light"
+      WHEN average_daily_steps BETWEEN 7001 AND 10000 THEN "Average"
+      ELSE "Very" END AS Activity_Level
+FROM `spatial-motif-388503.Health.Average Daily Steps` 
+
+# Calculating percent of sample in each activity level:
+
+WITH activity_count AS
+  (SELECT Activity_Level,
+      COUNT(ID) group_count
+FROM `spatial-motif-388503.Health.User_Activity_Level`
+GROUP BY Activity_Level)
+SELECT Activity_level,
+      activity_count.group_count,
+      (activity_count.group_count / 33) * 100 percent_of_sample
+FROM activity_count
+GROUP BY Activity_level, 2
+
+# Checking average hours of sleep per night from sample
+
+WITH total_monthly_sleep_hours as
+  (SELECT ID,
+    SUM(hours_asleep) as hours_asleep
+FROM `spatial-motif-388503.Health.Sleepday` 
+GROUP BY Id)
+SELECT ID, 
+      (total_monthly_sleep_hours.hours_asleep * 12) / 365 avg_hours_per_night
+FROM total_monthly_sleep_hours 
+
+# Creating breakdown of average calorie and average step metric by hour 
+
+-- First create average calorie by hour cut -- 
+
+SELECT Hour,
+      Avg(calories)
+FROM `spatial-motif-388503.Health.Hourly_Calories` 
+GROUP BY hour
+ORDER BY Hour
+
+-- Repeat with Steps -- 
+
+SELECT Hour,
+      Avg(steps)
+FROM `spatial-motif-388503.Health.Hourly_Steps` 
+GROUP BY hour
+ORDER BY Hour
+
+-- Join Calories and Steps table -- 
+
+SELECT calories.hour,
+      AVG(calories.Calories) average_calories,
+      AVG(steps.Steps) average_steps
+FROM `spatial-motif-388503.Health.HourlyCalories` calories
+LEFT JOIN `spatial-motif-388503.Health.Avg_HourlySteps` steps
+ON calories.Hour=steps.Hour 
+GROUP BY Hour 
+
+# Creating average active minutes and average moderately active minutes by weekday cut 
+
+-- First create cut showing day of week and average active minutes per day -- 
+
+SELECT day_of_week,
+      avg(active_minutes)avg_acive_mins
+ FROM `spatial-motif-388503.Health.ActiveMinutes` 
+GROUP BY day_of_week
+
+-- Then create moderately active minutes column by adding very active and fairly active minutes together -- 
+
+SELECT Day_of_week,
+      AVG(moderatley_active_mins)avg_moderately_active_mins 
+FROM `spatial-motif-388503.Health.moderately_active_weekday` 
+GROUP BY day_of_week
+
+-- Finally, join the two tables on day of week -- 
+
+SELECT day_of_week,
+      Avg_active_mins active_mins,
+      Avg_moderatley_active_mins moderately_active 
+FROM `spatial-motif-388503.Health.Active_mins` active_mins
+LEFT JOIN `spatial-motif-388503.Health.moderately_active_weekday` moderately_active
+ON day_of_week.active_mins=day_of_week.moderately_active 
+GROUP BY day_of_week
+
+
+# Categorising users by percentage of minutes they wore the device in the sample month 
+
+-- First create "minutes of month worn" and "percentage of month worn" -- 
+
+WITH minutes_worn_in_month as
+ 	(SELECT id,
+ 	SUM(total_minutes_worn_1) as minutes_worn_in_month 
+FROM `spatial-motif-388503.Health.DailyActivity` 
+GROUP BY Id
+ORDER BY 2 DESC)
+SELECT ID,
+  (minutes_worn_in_month.minutes_worn_in_month / 44640 * 100) as percent_month_worn
+FROM minutes_worn_in_month
+
+-- Then, create "usertype" categories --
+
+SELECT ID,
+      percent_month_worn,
+      CASE WHEN percent_month_worn > 90 THEN 'HIGH'
+          WHEN percent_month_worn BETWEEN 65 AND 90 THEN 'MEDIUM'
+          ELSE 'LOW' end as User_Type
+ FROM `spatial-motif-388503.Health.DeviceWornPercent` 
+
+# Adding usertype to sleep and weight datasets
+
+SELECT *
+ FROM `spatial-motif-388503.Health.Sleep` Sleep
+ LEFT JOIN `spatial-motif-388503.Health.IDUserTypes` usertypes
+ ON Sleep.Id=usertypes.ID
+
+# Creating count of number of users with an average of 5 or more days of exercise per week 
+
+SELECT ID,
+      Count(ActivityDate) days_any_fairly_active_minutes
+ FROM `spatial-motif-388503.Health.DailyActivityUserType` 
+ WHERE FairlyActiveMinutes > 0 or VeryActiveMinutes > 0
+ GROUP BY Id
+ HAVING days_any_fairly_active_minutes > 21
+
+# Finding average number of minutes spent in moderate exercise per week by user
+ 
+WITH moderately_active_minnutes as 
+      (SELECT ID,
+      VeryActiveMinutes + FairlyActiveMinutes as moderately_active_mins
+FROM `spatial-motif-388503.Health.DailyActivity` 
+Group By Id, 2) 
+Select id,
+      (moderately_active_minnutes.moderately_active_mins * 12) / 52 as avg_weekly_moderate_exercise
+FROM moderately_active_minnutes
+GROUP BY ID, 2
+
+# Flagging if user met guidelines for average weekly minutes of exercise 
+
+ SELECT ID,
+      avg_weekly_moderate_mins,
+      CASE WHEN avg_weekly_moderate_mins > 150 THEN 'YES'
+      ELSE 'NO' end as Meets_guidelines
+ FROM `spatial-motif-388503.Health.Avg_moderate_exercise` 
+
+# Using join function to identify the users who met both criteria 
+
+SELECT * 
+FROM `spatial-motif-388503.Health.5dayaverageplus` fivedayplus
+LEFT JOIN `spatial-motif-388503.Health.Meets_guidelines` guidelines 
+ON fivedayplus.Id=guidelines.ID
+
+# Categorising users based on ABS weekly values 
+
+SELECT ID,
+  CASE WHEN avg_weekly_moderate_mins = 0 THEN 'Zero Minutes'
+      WHEN avg_weekly_moderate_mins BETWEEN 1 AND 149 THEN '1 - 149 Minutes'
+      WHEN avg_weekly_moderate_mins BETWEEN 150 AND 300 THEN '150 - 300 Minutes'
+      ELSE 'More than 300 Minutes' END AS minutes_weekly_moderate
+  FROM `spatial-motif-388503.Health.Avg_moderate_exercise`
+
 
