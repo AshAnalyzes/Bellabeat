@@ -1,3 +1,10 @@
+/*
+Covid 19 Data Exploration 
+
+Skills used: Joins, CTE's, String funcions, Date and Time functions, Aggregate Functions
+
+*/
+
 # Counting number of unique users in each dataset:
 
 SELECT COUNT (DISTINCT id) 
