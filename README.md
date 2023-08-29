@@ -1,5 +1,5 @@
 # Bellabeat
-Competitive analysis of Fitbit dataset for Bellabeat case study using SQL.  You can find the tableau visualisation for this case study [here](https://public.tableau.com/app/profile/ashleigh.eaves/viz/BellabeatDraft/Dashboard)
+Competitive analysis of Fitbit dataset for Bellabeat case study using SQL.  You can find the tableau visualisation for this case study [here](https://public.tableau.com/app/profile/ashleigh.eaves) 
 
 # Scenario
 Bellabeat, a high-tech manufacturer of health-focused products, are a small player looking to expand their business in the global smart device market. Bellabeat’s product line is made up of the Bellabeat app, which allows users insight into their health by providing data on their activity, sleep, stress, menstrual cycle, and mindfulness habits. The Bellabeat app also connects to the company’s line of wearable smart device products. For the purpose of this case study, I will be focusing on the Leaf product, which can be worn as a bracelet, necklace or clip and tracks user activity, sleep and stress. 
